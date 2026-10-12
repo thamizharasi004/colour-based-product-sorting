@@ -1,0 +1,98 @@
+import cv2
+import numpy as np
+
+# Open the laptop camera
+camera = cv2.VideoCapture(0)
+
+if not camera.isOpened():
+    print("Error: Camera not found!")
+    raise SystemExit
+
+def detect_colour(h, s, v):
+    # Ignore very dark or low-saturation areas
+    if v < 40 or s < 60:
+        return "Unknown", "No sorting area"
+
+    # OpenCV Hue values range from 0 to 179
+    if h <= 10 or h >= 170:
+        return "Red", "Red Area"
+    elif h <= 22:
+        return "Orange", "Orange Area"
+    elif h <= 34:
+        return "Yellow", "Yellow Area"
+    elif h <= 85:
+        return "Green", "Green Area"
+    elif h <= 130:
+        return "Blue", "Blue Area"
+    else:
+        return "Unknown", "No sorting area"
+
+
+print("Colour-Based Product Sorting Started!")
+print("Place a product inside the box.")
+print("Press Q to quit.")
+
+while True:
+    success, frame = camera.read()
+
+    if not success:
+        print("Could not capture camera image.")
+        break
+
+    # Create a box in the centre of the camera view
+    height, width = frame.shape[:2]
+    box_size = 100
+
+    x1 = width // 2 - box_size // 2
+    y1 = height // 2 - box_size // 2
+    x2 = x1 + box_size
+    y2 = y1 + box_size
+
+    # Select the product area inside the box
+    roi = frame[y1:y2, x1:x2]
+
+    # Convert BGR image to HSV colour space
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+
+    # Ignore dark and nearly grey pixels
+    valid_pixels = hsv[
+        (hsv[:, :, 1] > 60) & (hsv[:, :, 2] > 40)
+    ]
+
+    if len(valid_pixels) > 0:
+        # Find the dominant hue using the median
+        h, s, v = np.median(
+            valid_pixels, axis=0
+        ).astype(int)
+
+        colour, area = detect_colour(h, s, v)
+    else:
+        colour = "Unknown"
+        area = "No sorting area"
+
+    # Display the detected colour and target area
+    cv2.rectangle(
+        frame, (x1, y1), (x2, y2),
+        (0, 255, 0), 2
+    )
+
+    cv2.putText(
+        frame, f"Colour: {colour}",
+        (20, 40), cv2.FONT_HERSHEY_SIMPLEX,
+        0.8, (0, 255, 0), 2
+    )
+
+    cv2.putText(
+        frame, f"Target: {area}",
+        (20, 80), cv2.FONT_HERSHEY_SIMPLEX,
+        0.8, (0, 255, 255), 2
+    )
+
+    cv2.imshow("Colour-Based Product Sorting", frame)
+
+    # Press Q to close the program
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
+
+camera.release()
+cv2.destroyAllWindows()
